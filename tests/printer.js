@@ -176,52 +176,102 @@ describe('Printer', function () {
 		assertEllipse(Pdfkit.prototype.ellipse.secondCall.args);
 
 	});
-	
+
 	it('should print only the require number of pages', function () {
-    printer = new Printer(fontDescriptors);
-    
-    var docDefinition = {
-      pageSize: 'A4',
+		printer = new Printer(fontDescriptors);
+
+		var docDefinition = {
+			pageSize: 'A4',
 			maxPagesNumber: 1,
-      content: [
-      {
-        text: 'Page 1'
-      },
-      {
-        text: 'Page 2',
-        pageBreak: 'before',
-        pageOrientation: 'landscape'
-      }]
-    };
-    
-    printer.createPdfKitDocument(docDefinition);
-    
-    assert(Pdfkit.prototype.addPage.callCount === 1);
+			content: [
+				{
+					text: 'Page 1'
+				},
+				{
+					text: 'Page 2',
+					pageBreak: 'before',
+					pageOrientation: 'landscape'
+				}]
+		};
+
+		printer.createPdfKitDocument(docDefinition);
+
+		assert(Pdfkit.prototype.addPage.callCount === 1);
 	});
-  
-  it('should print all pages when maxPagesNumber is undefined', function () {
-    printer = new Printer(fontDescriptors);
-    
-    var docDefinition = {
-      pageSize: 'A4',
-      content: [
-        {
-          text: 'Page 1'
-        },
-        {
-          text: 'Page 2',
-          pageBreak: 'before',
-          pageOrientation: 'landscape'
-        },
-        {
-          text: 'Page 3',
-          pageBreak: 'before',
-        }]
-    };
-    
-    printer.createPdfKitDocument(docDefinition);
-    
-    assert(Pdfkit.prototype.addPage.callCount === 3);
-  });
+
+	it('should print all pages when maxPagesNumber is undefined', function () {
+		printer = new Printer(fontDescriptors);
+
+		var docDefinition = {
+			pageSize: 'A4',
+			content: [
+				{
+					text: 'Page 1'
+				},
+				{
+					text: 'Page 2',
+					pageBreak: 'before',
+					pageOrientation: 'landscape'
+				},
+				{
+					text: 'Page 3',
+					pageBreak: 'before',
+				}]
+		};
+
+		printer.createPdfKitDocument(docDefinition);
+
+		assert(Pdfkit.prototype.addPage.callCount === 3);
+	});
+
+	it('should report progress on each rendered item when a progressCallback is passed', function () {
+
+		printer = new Printer(fontDescriptors);
+
+		var progressCallback = sinon.spy(function (progress) {});
+
+		var docDefinition = {
+			pageSize: 'A4',
+			content: [
+				{
+					text: 'Text item 1'
+				},
+				{
+					image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAGAQMAAADNIO3CAAAAA1BMVEUAAN7GEcIJAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB98DBREbA3IZ3d8AAAALSURBVAjXY2BABwAAEgAB74lUpAAAAABJRU5ErkJggg=='
+				},
+				{
+					text: 'Text item 2'
+				},
+				{
+					canvas: [{
+							type: 'rect',
+							x: 0,
+							y: 0,
+							w: 310,
+							h: 260
+						}]
+				}]
+		};
+
+		printer.createPdfKitDocument(docDefinition, {progressCallback: progressCallback});
+
+		assert(progressCallback.withArgs(0.25).calledOnce);
+		assert(progressCallback.withArgs(0.5).calledOnce);
+		assert(progressCallback.withArgs(0.75).calledOnce);
+		assert(progressCallback.withArgs(1).calledOnce);
+	});
+
+	it('should work without a progressCallback', function () {
+		printer = new Printer(fontDescriptors);
+
+		var docDefinition = {
+			pageSize: 'A4',
+			content: [{text: 'Text item 1'}]
+		};
+
+		assert.doesNotThrow(function () {
+			printer.createPdfKitDocument(docDefinition);
+		});
+	});
 
 });

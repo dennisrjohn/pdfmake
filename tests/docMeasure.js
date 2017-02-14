@@ -137,23 +137,29 @@ describe('DocMeasure', function () {
 		});
 	});
 
-	describe('measureList', function () {
+	describe('measureUnorderedList', function () {
 		it('should extend document-definition-object if text items are used', function () {
-			var result = docMeasure.measureList(true, {ol: ['asdasd', 'bbbb']});
-
-			assert(result.ol[0]._minWidth);
-			assert(result.ol[0]._maxWidth);
-
-			result = docMeasure.measureList(false, {ul: ['asdasd', 'bbbb']});
+			var result = docMeasure.measureUnorderedList({ul: ['asdasd', 'bbbb']});
 
 			assert(result.ul[0]._minWidth);
 			assert(result.ul[0]._maxWidth);
 
 			assert(result._gapSize);
 		});
+	});
+
+	describe('measureOrderedList', function () {
+		it('should extend document-definition-object if text items are used', function () {
+			var result = docMeasure.measureOrderedList({ol: ['asdasd', 'bbbb']});
+
+			assert(result.ol[0]._minWidth);
+			assert(result.ol[0]._maxWidth);
+
+			assert(result._gapSize);
+		});
 
 		it('should calculate _minWidth and _maxWidth of all elements', function () {
-			var result = docMeasure.measureList(true, {ol: ['this is a test', 'another one']});
+			var result = docMeasure.measureOrderedList({ol: ['this is a test', 'another one']});
 
 			assert.equal(result.ol[0]._minWidth, 4 * 12);
 			assert.equal(result.ol[0]._maxWidth, 14 * 12);
@@ -163,7 +169,7 @@ describe('DocMeasure', function () {
 
 		it('should set _minWidth and _maxWidth to the max of inner min/max widths + gapSize', function () {
 			var node = {ol: ['this is a test', 'another one']};
-			var result = docMeasure.measureList(true, node);
+			var result = docMeasure.measureOrderedList(node);
 
 			assert(node, result);
 			assert(node._gapSize.width > 0);

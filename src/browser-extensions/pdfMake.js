@@ -1,6 +1,5 @@
 /* jslint node: true */
 /* jslint browser: true */
-/* global BlobBuilder */
 'use strict';
 
 var PdfPrinter = require('../printer');
@@ -44,8 +43,11 @@ Document.prototype._createDoc = function (options, callback) {
 	var chunks = [];
 	var result;
 
-	doc.on('data', function (chunk) {
-		chunks.push(chunk);
+	doc.on('readable', function () {
+		var chunk;
+		while ((chunk = doc.read(9007199254740991)) !== null) {
+			chunks.push(chunk);
+		}
 	});
 	doc.on('end', function () {
 		result = Buffer.concat(chunks);
@@ -56,105 +58,84 @@ Document.prototype._createDoc = function (options, callback) {
 
 Document.prototype._getPages = function (options, cb) {
 	if (!cb) {
-		throw 'getBuffer is an async method and needs a callback argument';
+		throw '_getPages is an async method and needs a callback argument';
 	}
 	this._createDoc(options, function (ignoreBuffer, pages) {
 		cb(pages);
 	});
 };
 
-Document.prototype.open = function (message) {
+Document.prototype._bufferToBlob = function (buffer) {
+	var blob;
+	try {
+		blob = new Blob([buffer], {type: 'application/pdf'});
+	} catch (e) {
+		// Old browser which can't handle it without making it an byte array (ie10)
+		if (e.name === 'InvalidStateError') {
+			var byteArray = new Uint8Array(buffer);
+			blob = new Blob([byteArray.buffer], {type: 'application/pdf'});
+		}
+	}
+
+	if (!blob) {
+		throw 'Could not generate blob';
+	}
+
+	return blob;
+};
+
+Document.prototype._openWindow = function () {
 	// we have to open the window immediately and store the reference
 	// otherwise popup blockers will stop us
 	var win = window.open('', '_blank');
+	if (win === null) {
+		throw 'Open PDF in new window blocked by browser';
+	}
 
+	return win;
+};
+
+Document.prototype._openPdf = function (options) {
+	var win = this._openWindow();
 	try {
-		this.getBuffer(function (result) {
-			var blob;
-			try {
-				blob = new Blob([result], {type: 'application/pdf'});
-			} catch (e) {
-				// Old browser which can't handle it without making it an byte array (ie10)
-				if (e.name == 'InvalidStateError') {
-					var byteArray = new Uint8Array(result);
-					blob = new Blob([byteArray.buffer], {type: 'application/pdf'});
-				}
-			}
-
-			if (blob) {
-				var urlCreator = window.URL || window.webkitURL;
-				var pdfUrl = urlCreator.createObjectURL(blob);
-				win.location.href = pdfUrl;
-			} else {
-				throw 'Could not generate blob';
-			}
-		}, {autoPrint: false});
+		this.getBlob(function (result) {
+			var urlCreator = window.URL || window.webkitURL;
+			var pdfUrl = urlCreator.createObjectURL(result);
+			win.location.href = pdfUrl;
+		}, options);
 	} catch (e) {
 		win.close();
 		throw e;
 	}
 };
 
+Document.prototype.open = function (options) {
+	options.autoPrint = false;
 
-Document.prototype.print = function () {
-	// we have to open the window immediately and store the reference
-	// otherwise popup blockers will stop us
-	var win = window.open('', '_blank');
-
-	try {
-		this.getBuffer(function (result) {
-			var blob;
-			try {
-				blob = new Blob([result], {type: 'application/pdf'});
-			} catch (e) {
-				// Old browser which can't handle it without making it an byte array (ie10)
-				if (e.name == 'InvalidStateError') {
-					var byteArray = new Uint8Array(result);
-					blob = new Blob([byteArray.buffer], {type: 'application/pdf'});
-				}
-			}
-
-			if (blob) {
-				var urlCreator = window.URL || window.webkitURL;
-				var pdfUrl = urlCreator.createObjectURL(blob);
-				win.location.href = pdfUrl;
-			} else {
-				throw 'Could not generate blob';
-			}
-		}, {autoPrint: true});
-	} catch (e) {
-		win.close();
-		throw e;
-	}
+	this._openPdf(options);
 };
 
-Document.prototype.download = function (defaultFileName, cb) {
+
+Document.prototype.print = function (options) {
+	options.autoPrint = true;
+
+	this._openPdf(options);
+};
+
+Document.prototype.download = function (defaultFileName, cb, options) {
 	if (typeof defaultFileName === 'function') {
 		cb = defaultFileName;
 		defaultFileName = null;
 	}
 
 	defaultFileName = defaultFileName || 'file.pdf';
-	this.getBuffer(function (result) {
-		var blob;
-		try {
-			blob = new Blob([result], {type: 'application/pdf'});
-		} catch (e) {
-			// Old browser which can't handle it without making it an byte array (ie10)
-			if (e.name == 'InvalidStateError') {
-				var byteArray = new Uint8Array(result);
-				blob = new Blob([byteArray.buffer], {type: 'application/pdf'});
-			}
-		}
-		if (blob) {
-			saveAs(blob, defaultFileName);
-		} else {
-			throw 'Could not generate blob';
-		}
+	this.getBlob(function (result) {
+		saveAs(result, defaultFileName);
+
 		if (typeof cb === 'function') {
 			cb();
 		}
-	});
+	}, options);
 };
 
 Document.prototype.getBase64 = function (cb, options) {
@@ -172,6 +153,17 @@ Document.prototype.getDataUrl = function (cb, options) {
 	}
 	this.getBuffer(function (buffer) {
 		cb('data:application/pdf;base64,' + buffer.toString('base64'));
+	}, options);
+};
+
+Document.prototype.getBlob = function (cb, options) {
+	if (!cb) {
+		throw 'getBlob is an async method and needs a callback argument';
+	}
+	var that = this;
+	this.getBuffer(function (result) {
+		var blob = that._bufferToBlob(result);
+		cb(blob);
 	}, options);
 };
 
