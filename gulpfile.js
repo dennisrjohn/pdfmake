@@ -38,7 +38,7 @@ gulp.task('build', function () {
 gulp.task('fixBrokenFontkit', function() {
     return gulp.src(['./node_modules/fontkit/index.js'])
         .pipe(replace('var name = this.name.records.postscriptName;',
-            '      var name = this.name === undefined ? "" : this.name.records.postscriptName;'))
+            '      if (this.name === undefined || this.name.records.postscriptName === undefined) return ""; var name = this.name.records.postscriptName;'))
         .pipe(gulp.dest('./node_modules/fontkit/', {overwrite: true}));
 })
 
